@@ -325,7 +325,7 @@ class McpSession {
             entry.timer.unref?.();
 
             const onAbort = () => {
-                this.notify("notifications/cancelled", { requestId: id, reason: "client aborted" });
+                this.notify("notifications/cancelled", { requestId: id, id, reason: "client aborted" });
                 this.settle(id, new McpAbortError());
             };
 
