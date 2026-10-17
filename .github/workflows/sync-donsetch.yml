@@ -43,7 +43,7 @@ jobs:
 
             - name: Bump the addon version
               if: steps.changes.outputs.changed == 'true'
-              run: npm version patch --no-git-tag-version
+              run: npm version patch --no-git-tag-version --force
 
             - name: Open a pull request
               if: steps.changes.outputs.changed == 'true'
