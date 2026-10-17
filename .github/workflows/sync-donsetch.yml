@@ -1,0 +1,77 @@
+name: Sync donsetch tools
+
+on:
+    schedule:
+        - cron: "0 6 * * *"
+    workflow_dispatch:
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    sync:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+
+            - name: Install donsetch and test packages
+              run: npm install --no-save @earendil-works/pi-mcp@1.1.0 @earendil-works/pi-ai@1.1.0 @earendil-works/pi-durable@1.1.0 donsetch@latest
+
+            - name: Generate the static tools
+              env:
+                  DONSETCH_BINARY: ${{ github.workspace }}/node_modules/donsetch/binaries/donsetch
+              run: node scripts/generate-tools.mjs
+
+            - name: Check for changes
+              id: changes
+              run: |
+                  if git diff --quiet -- donsetch.ts tools.lock.json; then
+                    echo "changed=false" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "changed=true" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: Check the module
+              if: steps.changes.outputs.changed == 'true'
+              env:
+                  DONSETCH_BINARY: ${{ github.workspace }}/node_modules/donsetch/binaries/donsetch
+              run: node scripts/check-module.mjs
+
+            - name: Bump the addon version
+              if: steps.changes.outputs.changed == 'true'
+              run: npm version patch --no-git-tag-version
+
+            - name: Open a pull request
+              if: steps.changes.outputs.changed == 'true'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  existing="$(gh pr list --state open --search 'Sync donsetch tools in:title' --json number --jq '.[0].number')"
+                  if [ -n "$existing" ]; then
+                    echo "An open sync PR already exists: #$existing"
+                    exit 0
+                  fi
+
+                  version="$(node -p "require('./tools.lock.json').donsetch")"
+                  branch="sync/donsetch-$(date +%Y%m%d-%H%M%S)"
+
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git checkout -b "$branch"
+                  git add donsetch.ts tools.lock.json package.json
+                  git commit -m "Sync donsetch tools to ${version}"
+                  git push origin "$branch"
+
+                  cat > /tmp/sync-body.md <<EOF
+                  Automated tool sync with donsetch ${version}.
+
+                  This PR updates the static tool block and tools.lock.json from the latest npm release. Review the tool names, descriptions, schemas, and read-only flags before merging.
+
+                  AI-generated notice: An AI assistant generated this workflow and its text. Review the diff before merging.
+                  EOF
+
+                  gh pr create --head "$branch" --title "Sync donsetch tools" --body-file /tmp/sync-body.md

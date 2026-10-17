@@ -1,6 +1,6 @@
 {
     "name": "donsetch-pi-durable",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "private": true,
     "type": "module",
     "description": "DonSeTch web fetch, search, crawl, and screenshot tools for Pi Pocket",
@@ -25,6 +25,9 @@
         "test": "node --test donsetch.test.ts",
         "check": "tsc --noEmit -p .",
         "probe": "node scripts/probe-tools.mjs",
-        "check-upstream": "node scripts/check-upstream.mjs"
+        "check-upstream": "node scripts/check-upstream.mjs",
+        "generate-tools": "node scripts/generate-tools.mjs",
+        "check-tools": "node scripts/generate-tools.mjs --check",
+        "check-module": "node scripts/check-module.mjs"
     }
 }

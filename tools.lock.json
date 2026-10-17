@@ -1,0 +1,21 @@
+{
+    "donsetch": "4.10.1",
+    "tools": {
+        "web_fetch": {
+            "sha256": "8f9d1964b0da2f8440c211ab0d3e15854c4b0908ff0b1b5ea2d0f71018de2081",
+            "readOnly": false
+        },
+        "web_search": {
+            "sha256": "7c97d8879b6dd5ecf2c9f09a195d4f598b5c97bf060a9df3747a6752bf3d32ff",
+            "readOnly": true
+        },
+        "web_crawl": {
+            "sha256": "5638940af2a9842b68828800f436a5e70605a2ebbe956632bd085e5313e1e84f",
+            "readOnly": true
+        },
+        "web_screenshot": {
+            "sha256": "6b901c152bce279afa0e015a3bd507858100e8013c259c4bf8d096d1f3a71ff0",
+            "readOnly": true
+        }
+    }
+}
