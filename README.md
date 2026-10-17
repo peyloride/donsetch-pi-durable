@@ -1,5 +1,7 @@
 # donsetch for Pi Pocket
 
+> AI-generated notice: The code and documentation in this repository were generated with an AI assistant. Review them before you use or share them.
+
 A Pi Pocket drop-in that gives Pi DonSeTch's four web tools:
 
 | Tool | What it does |
@@ -9,7 +11,7 @@ A Pi Pocket drop-in that gives Pi DonSeTch's four web tools:
 | `web_crawl` | Crawl a site with budgets, resume tokens, and honest stop reasons. |
 | `web_screenshot` | Capture a rendered PNG. |
 
-The addon is a thin MCP bridge. It carries a small MCP stdio client of its own, and imports only Pi Pocket's `@earendil-works/pi-ai` and `@earendil-works/pi-durable` packages. It discovers the tools from the installed binary at load, so new tools and arguments appear after a reload without changing this file.
+The addon talks to donsetch over MCP. It includes its own small MCP stdio client and imports only Pi Pocket's `@earendil-works/pi-ai` and `@earendil-works/pi-durable` packages. It reads the tool list from the installed binary at load, so new tools and arguments appear after a reload without changing this file.
 
 ## Requirements
 
