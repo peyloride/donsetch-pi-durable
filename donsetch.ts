@@ -1,15 +1,16 @@
 /**
  * DonSeTch web fetch, search, crawl, and screenshot tools for Pi Pocket, through the local donsetch MCP binary.
  *
- * This is an independent MIT-licensed bridge. DonSeTch itself is AGPL-3.0 and runs as a separate program. The MCP
- * client and transports come from the MIT-licensed @earendil-works/pi-mcp package that Pi Pocket ships.
+ * This is an independent MIT-licensed bridge. DonSeTch itself is AGPL-3.0 and runs as a separate program. The module
+ * speaks the Model Context Protocol over stdio with Node's own modules. It imports only Pi Pocket's
+ * @earendil-works/pi-ai and @earendil-works/pi-durable packages.
  */
+import { spawn, type ChildProcess } from "node:child_process";
 import { access, constants, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { Type, type TSchema } from "@earendil-works/pi-ai";
 import { defineExtension, defineTool, type ConversationId } from "@earendil-works/pi-durable";
-import type { CallToolResult, McpClient, StdioTransport, Tool as McpTool } from "@earendil-works/pi-mcp";
 import type { Host, Web } from "./_pocket.d.ts";
 
 /** The version of Pi Pocket's extension API that this module is written for. */
@@ -17,6 +18,7 @@ export const pocketApi = 1;
 
 const CLIENT_NAME = "pi-pocket-donsetch";
 const CLIENT_VERSION = "1.0.0";
+const PROTOCOL_VERSION = "2024-11-05";
 const INIT_TIMEOUT_MS = 30_000;
 const PROBE_TIMEOUT_MS = 10_000;
 const DEFAULT_CALL_TIMEOUT_MS = 120_000;
@@ -28,15 +30,435 @@ const SWEEP_MS = 60_000;
 const BINARY_NAMES = process.platform === "win32" ? ["donsetch.exe", "donsetch.cmd"] : ["donsetch"];
 const PACKAGE_BINARY = process.platform === "win32" ? "donsetch.exe" : "donsetch";
 const TOOL_NAME = /^[A-Za-z0-9_-]{1,64}$/;
+const STDERR_LIMIT = 4_096;
 
-type Mcp = typeof import("@earendil-works/pi-mcp");
+interface McpTool {
+    name: string;
+    title?: string;
+    description?: string;
+    inputSchema: Record<string, unknown>;
+    annotations?: { readOnlyHint?: boolean };
+}
 
-interface Session {
-    readonly client: McpClient;
-    readonly transport: StdioTransport;
-    lastUsed: number;
-    busy: number;
-    closed: boolean;
+interface McpToolResult {
+    content?: unknown[];
+    structuredContent?: unknown;
+    isError?: boolean;
+}
+
+interface InitializeResult {
+    protocolVersion?: string;
+    serverInfo?: { name?: string; version?: string };
+}
+
+interface ToolsPage {
+    tools?: McpTool[];
+    nextCursor?: string;
+}
+
+interface Pending {
+    resolve: (value: unknown) => void;
+    reject: (error: Error) => void;
+    timer: NodeJS.Timeout;
+    signal?: AbortSignal;
+    onAbort?: () => void;
+}
+
+type LlmContent = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
+
+class McpAbortError extends Error {
+    constructor() {
+        super("donsetch request cancelled");
+        this.name = "McpAbortError";
+    }
+}
+
+class McpClosedError extends Error {
+    constructor(message = "donsetch MCP server is closed") {
+        super(message);
+        this.name = "McpClosedError";
+    }
+}
+
+/** Kill the server and the children it started. */
+function killTree(child: ChildProcess, signal: NodeJS.Signals): void {
+    if (child.exitCode !== null || child.signalCode !== null) {
+        return;
+    }
+
+    if (process.platform === "win32") {
+        if (signal === "SIGTERM") {
+            try {
+                child.kill("SIGTERM");
+            } catch {
+                // The process is already gone.
+            }
+            return;
+        }
+
+        spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true }).on(
+            "error",
+            () => {},
+        );
+        return;
+    }
+
+    const pid = child.pid;
+
+    if (pid === undefined) {
+        return;
+    }
+
+    try {
+        process.kill(-pid, signal);
+    } catch {
+        try {
+            child.kill(signal);
+        } catch {
+            // The process is already gone.
+        }
+    }
+}
+
+/** A small MCP 2.0 client over stdio: initialize, tools/list, tools/call, cancellation, and shutdown. */
+class McpSession {
+    onClose?: () => void;
+    connected = false;
+    serverVersion = "unknown";
+    protocolVersion = "";
+    private readonly command: string;
+    private readonly onStderr: (chunk: string) => void;
+    private readonly initTimeoutMs: number;
+    private proc: ChildProcess | undefined;
+    private nextId = 1;
+    private readonly pending = new Map<number, Pending>();
+    private buffer = "";
+    private stderrText = "";
+    private closed = false;
+    private closePromise: Promise<void> | undefined;
+    private closeNotified = false;
+
+    constructor(command: string, onStderr: (chunk: string) => void, initTimeoutMs = INIT_TIMEOUT_MS) {
+        this.command = command;
+        this.onStderr = onStderr;
+        this.initTimeoutMs = initTimeoutMs;
+    }
+
+    get stderr(): string {
+        return this.stderrText;
+    }
+
+    async start(): Promise<void> {
+        if (this.proc !== undefined) {
+            throw new Error("donsetch MCP session already started");
+        }
+
+        const child = spawn(this.command, ["mcp", "--supervised"], {
+            stdio: ["pipe", "pipe", "pipe"],
+            env: process.env,
+            detached: process.platform !== "win32",
+            windowsHide: true,
+        });
+
+        this.proc = child;
+
+        child.stdout?.on("data", (chunk: Buffer) => this.read(chunk));
+        child.stderr?.on("data", (chunk: Buffer) => {
+            const text = chunk.toString();
+
+            this.stderrText = (this.stderrText + text).slice(-STDERR_LIMIT);
+            this.onStderr(text);
+        });
+        child.on("error", (error) => this.fail(error));
+        child.on("close", (code, signal) => {
+            this.fail(new McpClosedError(`donsetch MCP server exited (${code ?? signal ?? "unknown"})`));
+        });
+
+        await new Promise<void>((resolveSpawn, rejectSpawn) => {
+            const onSpawn = () => {
+                child.off("error", onError);
+                resolveSpawn();
+            };
+            const onError = (error: Error) => {
+                child.off("spawn", onSpawn);
+                rejectSpawn(error);
+            };
+
+            child.once("spawn", onSpawn);
+            child.once("error", onError);
+        });
+
+        const result = (await this.request(
+            "initialize",
+            {
+                protocolVersion: PROTOCOL_VERSION,
+                capabilities: {},
+                clientInfo: { name: CLIENT_NAME, version: CLIENT_VERSION },
+            },
+            this.initTimeoutMs,
+        )) as InitializeResult;
+
+        if (result === null || typeof result !== "object") {
+            throw new Error("donsetch sent an invalid initialize result.");
+        }
+
+        this.connected = true;
+        this.protocolVersion = typeof result.protocolVersion === "string" ? result.protocolVersion : "";
+        this.serverVersion = typeof result.serverInfo?.version === "string" ? result.serverInfo.version : "unknown";
+        this.notify("notifications/initialized", {});
+    }
+
+    async listTools(): Promise<McpTool[]> {
+        const tools: McpTool[] = [];
+        let cursor: string | undefined;
+
+        do {
+            const page = (await this.request(
+                "tools/list",
+                cursor === undefined ? {} : { cursor },
+                this.initTimeoutMs,
+            )) as ToolsPage;
+
+            if (Array.isArray(page.tools)) {
+                tools.push(...page.tools);
+            }
+
+            cursor = typeof page.nextCursor === "string" && page.nextCursor !== "" ? page.nextCursor : undefined;
+        } while (cursor !== undefined);
+
+        return tools;
+    }
+
+    async callTool(
+        name: string,
+        args: Record<string, unknown>,
+        options: { timeoutMs: number; signal?: AbortSignal },
+    ): Promise<McpToolResult> {
+        return (await this.request(
+            "tools/call",
+            { name, arguments: args },
+            options.timeoutMs,
+            options.signal,
+        )) as McpToolResult;
+    }
+
+    close(): Promise<void> {
+        this.closePromise ??= this.doClose();
+
+        return this.closePromise;
+    }
+
+    private async doClose(): Promise<void> {
+        this.closed = true;
+        this.connected = false;
+        this.rejectAll(new McpClosedError("donsetch MCP session closed"));
+
+        const child = this.proc;
+
+        if (child === undefined || child.pid === undefined) {
+            this.notifyClose();
+
+            return;
+        }
+
+        const done = new Promise<void>((resolveDone) => {
+            const finish = () => resolveDone();
+
+            child.once("close", finish);
+
+            if (child.exitCode !== null || child.signalCode !== null) {
+                finish();
+            }
+        });
+
+        child.stdin?.end();
+
+        const term = setTimeout(() => killTree(child, "SIGTERM"), 200);
+        const kill = setTimeout(() => killTree(child, "SIGKILL"), 1_200);
+        let limit: NodeJS.Timeout | undefined;
+        const timedOut = new Promise<void>((resolveTimeout) => {
+            limit = setTimeout(resolveTimeout, 1_500);
+            limit.unref?.();
+        });
+
+        try {
+            await Promise.race([done, timedOut]);
+        } finally {
+            if (limit !== undefined) {
+                clearTimeout(limit);
+            }
+
+            clearTimeout(term);
+            clearTimeout(kill);
+            this.notifyClose();
+        }
+    }
+
+    private request(
+        method: string,
+        params: unknown,
+        timeoutMs: number,
+        signal?: AbortSignal,
+    ): Promise<unknown> {
+        if (this.closed) {
+            return Promise.reject(new McpClosedError());
+        }
+
+        const id = this.nextId++;
+        const payload = `${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`;
+
+        return new Promise<unknown>((resolveRequest, rejectRequest) => {
+            if (aborted(signal)) {
+                rejectRequest(new McpAbortError());
+
+                return;
+            }
+
+            const entry: Pending = {
+                resolve: resolveRequest,
+                reject: rejectRequest,
+                timer: setTimeout(() => {
+                    this.settle(id, new Error(`donsetch MCP request timeout (${timeoutMs}ms): ${method}`));
+                }, timeoutMs),
+            };
+
+            entry.timer.unref?.();
+
+            const onAbort = () => {
+                this.notify("notifications/cancelled", { requestId: id, reason: "client aborted" });
+                this.settle(id, new McpAbortError());
+            };
+
+            entry.signal = signal;
+            entry.onAbort = onAbort;
+            signal?.addEventListener("abort", onAbort, { once: true });
+            this.pending.set(id, entry);
+
+            if (aborted(signal)) {
+                onAbort();
+
+                return;
+            }
+
+            const stdin = this.proc?.stdin;
+
+            if (stdin?.writable !== true) {
+                this.settle(id, new McpClosedError());
+
+                return;
+            }
+
+            stdin.write(payload, (error) => {
+                if (error) {
+                    this.settle(id, error);
+                }
+            });
+        });
+    }
+
+    private notify(method: string, params: unknown): void {
+        const stdin = this.proc?.stdin;
+
+        if (stdin?.writable !== true) {
+            return;
+        }
+
+        try {
+            stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method, params })}\n`);
+        } catch {
+            // The close handler reports the failure.
+        }
+    }
+
+    private read(chunk: Buffer): void {
+        this.buffer += chunk.toString();
+
+        const lines = this.buffer.split("\n");
+
+        this.buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+            const text = line.trim();
+
+            if (text === "") {
+                continue;
+            }
+
+            let message: { id?: number; result?: unknown; error?: { message?: string } };
+
+            try {
+                message = JSON.parse(text);
+            } catch {
+                continue;
+            }
+
+            if (typeof message.id !== "number") {
+                continue;
+            }
+
+            const entry = this.pending.get(message.id);
+
+            if (entry === undefined) {
+                continue;
+            }
+
+            this.pending.delete(message.id);
+            clearTimeout(entry.timer);
+
+            if (entry.onAbort !== undefined) {
+                entry.signal?.removeEventListener("abort", entry.onAbort);
+            }
+
+            if (message.error !== undefined) {
+                entry.reject(new Error(message.error.message ?? "donsetch MCP error"));
+            } else {
+                entry.resolve(message.result);
+            }
+        }
+    }
+
+    private settle(id: number, error: Error): void {
+        const entry = this.pending.get(id);
+
+        if (entry === undefined) {
+            return;
+        }
+
+        this.pending.delete(id);
+        clearTimeout(entry.timer);
+
+        if (entry.onAbort !== undefined) {
+            entry.signal?.removeEventListener("abort", entry.onAbort);
+        }
+
+        entry.reject(error);
+    }
+
+    private rejectAll(error: Error): void {
+        for (const id of [...this.pending.keys()]) {
+            this.settle(id, error);
+        }
+    }
+
+    private fail(error: Error): void {
+        if (this.closed) {
+            return;
+        }
+
+        this.closed = true;
+        this.connected = false;
+        this.rejectAll(error);
+        this.notifyClose();
+    }
+
+    private notifyClose(): void {
+        if (this.closeNotified) {
+            return;
+        }
+
+        this.closeNotified = true;
+        this.onClose?.();
+    }
 }
 
 /** A positive number from a tool argument, which some models send as text. */
@@ -75,8 +497,8 @@ function callTimeoutFor(tool: McpTool, args: Record<string, unknown>): number {
 }
 
 /** One sentence from the server's stderr, for a failure. */
-function stderrHint(transport: StdioTransport | undefined): string {
-    const text = transport?.stderr.trim();
+function stderrHint(session: McpSession | undefined): string {
+    const text = session?.stderr.trim();
 
     if (!text) {
         return "";
@@ -174,6 +596,61 @@ function isReadOnly(tool: McpTool): boolean {
     return tool.annotations?.readOnlyHint ?? true;
 }
 
+/** Convert MCP content blocks to the text and image blocks that Pi reads. */
+function toLlmContent(result: McpToolResult): LlmContent[] {
+    const content: LlmContent[] = [];
+
+    for (const block of result.content ?? []) {
+        if (block === null || typeof block !== "object") {
+            continue;
+        }
+
+        const value = block as Record<string, unknown>;
+
+        if (value.type === "text" && typeof value.text === "string") {
+            content.push({ type: "text", text: value.text });
+            continue;
+        }
+
+        if (value.type === "image" && typeof value.data === "string") {
+            content.push({
+                type: "image",
+                data: value.data,
+                mimeType: typeof value.mimeType === "string" ? value.mimeType : "image/png",
+            });
+            continue;
+        }
+
+        if (value.type === "resource") {
+            const resource = value.resource;
+
+            if (resource !== null && typeof resource === "object") {
+                const item = resource as Record<string, unknown>;
+
+                if (typeof item.text === "string") {
+                    content.push({ type: "text", text: item.text });
+                    continue;
+                }
+
+                if (typeof item.uri === "string") {
+                    content.push({ type: "text", text: `[resource: ${item.uri}]` });
+                    continue;
+                }
+            }
+        }
+
+        if (value.type === "resource_link" && typeof value.uri === "string") {
+            content.push({ type: "text", text: `[resource: ${value.uri}]` });
+        }
+    }
+
+    if (content.length === 0 && result.structuredContent !== undefined) {
+        content.push({ type: "text", text: JSON.stringify(result.structuredContent, null, 2) });
+    }
+
+    return content;
+}
+
 /**
  * The four standard tools, for a load without the binary, such as the gallery check. The model gets the exact schemas
  * from the binary when it is there. These schemas stay permissive so a later donsetch argument still passes.
@@ -244,17 +721,14 @@ const FALLBACK_TOOLS: McpTool[] = [
     },
 ];
 
+interface Session {
+    readonly client: McpSession;
+    lastUsed: number;
+    busy: number;
+    closed: boolean;
+}
+
 export default async function createDonsetch(host: Host, web: Web) {
-    let mcp: Mcp;
-
-    try {
-        mcp = await import("@earendil-works/pi-mcp");
-    } catch (error) {
-        throw new Error(
-            "donsetch needs @earendil-works/pi-mcp, which Pi Pocket ships. " + describeError(error),
-        );
-    }
-
     let binary: string | undefined;
     let binaryProblem: string | undefined;
 
@@ -291,37 +765,24 @@ export default async function createDonsetch(host: Host, web: Web) {
             throw new Error(binaryProblem ?? "donsetch binary not found.");
         }
 
-        const transport = new mcp.StdioTransport({
-            command,
-            args: ["mcp", "--supervised"],
-            inheritEnv: true,
-            stderr: "pipe",
-            onStderr: forwardStderr,
-            closeTimeoutMs: 2_000,
-        });
-        const client = new mcp.McpClient({
-            name: CLIENT_NAME,
-            title: "Pi Pocket DonSeTch",
-            version: CLIENT_VERSION,
-            requestTimeoutMs: timeoutMs,
-        });
-        const session: Session = { client, transport, lastUsed: Date.now(), busy: 0, closed: false };
-        live.add(session);
+        const client = new McpSession(command, forwardStderr, timeoutMs);
+        const session: Session = { client, lastUsed: Date.now(), busy: 0, closed: false };
 
-        client.onClose(() => {
+        live.add(session);
+        client.onClose = () => {
             session.closed = true;
             live.delete(session);
 
             if (conversationId !== undefined && sessions.get(conversationId) === session) {
                 sessions.delete(conversationId);
             }
-        });
+        };
 
         try {
-            await client.connect(transport);
+            await client.start();
         } catch (error) {
             await closeSession(session);
-            throw new Error(`donsetch failed to start (${command}): ${describeError(error)}${stderrHint(transport)}`);
+            throw new Error(`donsetch failed to start (${command}): ${describeError(error)}${stderrHint(client)}`);
         }
 
         return session;
@@ -373,13 +834,13 @@ export default async function createDonsetch(host: Host, web: Web) {
         try {
             probe = await openSession(undefined, PROBE_TIMEOUT_MS);
             discovered = await probe.client.listTools();
-            serverVersion = probe.client.serverInfo?.version ?? "unknown";
+            serverVersion = probe.client.serverVersion;
 
             if (discovered.length === 0) {
                 throw new Error("donsetch returned no tools.");
             }
         } catch (error) {
-            probeProblem = `${describeError(error)}${stderrHint(probe?.transport)}`;
+            probeProblem = `${describeError(error)}${stderrHint(probe?.client)}`;
         } finally {
             if (probe !== undefined) {
                 const current = probe;
@@ -434,7 +895,7 @@ export default async function createDonsetch(host: Host, web: Web) {
 
         const existing = sessions.get(conversationId);
 
-        if (existing !== undefined && !existing.closed && existing.client.connectionState === "connected") {
+        if (existing !== undefined && !existing.closed && existing.client.connected) {
             return existing;
         }
 
@@ -475,7 +936,7 @@ export default async function createDonsetch(host: Host, web: Web) {
         tool: McpTool,
         args: Record<string, unknown>,
         signal: AbortSignal | undefined,
-    ): Promise<CallToolResult> {
+    ): Promise<McpToolResult> {
         let lastError: unknown;
 
         for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -512,7 +973,7 @@ export default async function createDonsetch(host: Host, web: Web) {
             } catch (error) {
                 lastError = error;
                 const connectionLost =
-                    error instanceof mcp.McpConnectionClosedError ||
+                    error instanceof McpClosedError ||
                     /closed|disconnected|EPIPE|not running/i.test(describeError(error));
 
                 if (connectionLost) {
@@ -566,7 +1027,7 @@ export default async function createDonsetch(host: Host, web: Web) {
 
                 try {
                     const result = await callTool(api.conversationId, mcpTool, input, context.abortSignal);
-                    const content = mcp.toLlmContent(result);
+                    const content = toLlmContent(result);
                     const blocks =
                         content.length > 0
                             ? content
@@ -582,7 +1043,7 @@ export default async function createDonsetch(host: Host, web: Web) {
                         details: { mcpTool: name, cancelled: false, chars, isError: result.isError === true },
                     };
                 } catch (error) {
-                    if (error instanceof mcp.McpAbortError || aborted(context.abortSignal)) {
+                    if (error instanceof McpAbortError || aborted(context.abortSignal)) {
                         return {
                             content: [{ type: "text" as const, text: "Cancelled" }],
                             details: { mcpTool: name, cancelled: true, chars: 0, isError: false },

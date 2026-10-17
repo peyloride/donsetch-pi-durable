@@ -9,7 +9,7 @@ A Pi Pocket drop-in that gives Pi DonSeTch's four web tools:
 | `web_crawl` | Crawl a site with budgets, resume tokens, and honest stop reasons. |
 | `web_screenshot` | Capture a rendered PNG. |
 
-The addon is a thin MCP bridge. It discovers the tools from the installed binary at load, so new tools and arguments appear after a reload without changing this file.
+The addon is a thin MCP bridge. It carries a small MCP stdio client of its own, and imports only Pi Pocket's `@earendil-works/pi-ai` and `@earendil-works/pi-durable` packages. It discovers the tools from the installed binary at load, so new tools and arguments appear after a reload without changing this file.
 
 ## Requirements
 
@@ -19,7 +19,6 @@ The addon is a thin MCP bridge. It discovers the tools from the installed binary
   2. `PATH`
   3. the Pi agent npm package (`<agentDir>/npm/node_modules/donsetch/binaries/donsetch`)
   4. `~/.cargo/bin/donsetch`
-- `@earendil-works/pi-mcp` 1.1.x. Pi Pocket ships it with `@earendil-works/pi-coding-agent`.
 
 Install the binary with one of these:
 
@@ -97,4 +96,4 @@ The test defaults to `~/pi-pocket` when `PI_POCKET_REPO` is not set. It imports 
 
 MIT. See `LICENSE`.
 
-DonSeTch is AGPL-3.0 and is a separate program. This addon does not include DonSeTch code; it talks to the binary over MCP. `@earendil-works/pi-mcp` is MIT.
+DonSeTch is AGPL-3.0 and is a separate program. This addon does not include DonSeTch code; it talks to the binary over MCP.
