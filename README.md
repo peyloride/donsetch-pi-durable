@@ -74,6 +74,7 @@ The addon gives the child process a limited environment. It includes `PATH`, `HO
 - The addon runs the local `donsetch` binary with the Pi Pocket server's rights.
 - The child process gets a limited environment. Provider keys and unrelated secrets stay out.
 - Web page text and images go to the model as tool results. The addon fences text with `host.text.defang` and adds a data notice. Images get the text notice. The model is told the content is data, not instructions.
+- `web_search` sends queries to Google, Bing, Brave, DuckDuckGo, Yahoo, Mojeek, GitHub, Wikipedia, Hacker News, Semantic Scholar, arXiv, Stack Exchange, MDN, and Google News. Donsetch can change this list.
 - `web_fetch` page actions can change state on the remote page. Use them only when the request needs them.
 - The addon does not read provider keys, cookies, or other credentials. Donsetch can use its own saved login cookies.
 - Review `donsetch.ts` before you turn it on. A drop-in runs with the owner's rights.

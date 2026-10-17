@@ -1,9 +1,9 @@
 /**
  * DonSeTch web fetch, search, crawl, and screenshot tools for Pi Pocket, through the local donsetch MCP binary. The
  * module starts that binary on the first tool call in each conversation with a limited environment. The binary contacts
- * the URLs you request and the third-party search engines and sources used by web_search, including GitHub, Wikipedia,
- * Hacker News, Semantic Scholar, arXiv, Stack Exchange, MDN, and Google News. See the donsetch documentation for the
- * current providers.
+ * the URLs you request and the third-party search engines and sources used by web_search, including Google, Bing, Brave,
+ * DuckDuckGo, Yahoo, Mojeek, GitHub, Wikipedia, Hacker News, Semantic Scholar, arXiv, Stack Exchange, MDN, and Google
+ * News. See the donsetch documentation for the current providers.
  *
  * This is an independent MIT-licensed bridge. DonSeTch itself is AGPL-3.0 and runs as a separate program. The module
  * speaks the Model Context Protocol over stdio with Node's own modules. It imports only Pi Pocket's
