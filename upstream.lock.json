@@ -1,0 +1,19 @@
+{
+    "npm": {
+        "name": "donsetch",
+        "version": "4.10.1"
+    },
+    "source": {
+        "tarball": "https://registry.npmjs.org/donsetch/-/donsetch-4.10.1.tgz",
+        "path": "package/pi-extension.ts",
+        "sha256": "a0325d3f4ec46f2fa50b75486b26215042106fb92132860dde84c73733550ba5"
+    },
+    "bridge": {
+        "command": "mcp --supervised",
+        "protocolVersion": "2024-11-05",
+        "initTimeoutMs": "30_000",
+        "callTimeoutMs": "120_000",
+        "deadlineSlackMs": "20_000",
+        "maxCallTimeoutMs": "620_000"
+    }
+}

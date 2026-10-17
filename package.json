@@ -1,0 +1,30 @@
+{
+    "name": "donsetch-pi-durable",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "description": "DonSeTch web fetch, search, crawl, and screenshot tools for Pi Pocket",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/peyloride/donsetch-pi-durable.git"
+    },
+    "homepage": "https://github.com/peyloride/donsetch-pi-durable#readme",
+    "bugs": {
+        "url": "https://github.com/peyloride/donsetch-pi-durable/issues"
+    },
+    "keywords": [
+        "pi-pocket",
+        "pi-durable",
+        "donsetch",
+        "mcp",
+        "web-fetch",
+        "web-search"
+    ],
+    "scripts": {
+        "test": "node --test donsetch.test.ts",
+        "check": "tsc --noEmit -p .",
+        "probe": "node scripts/probe-tools.mjs",
+        "check-upstream": "node scripts/check-upstream.mjs"
+    }
+}

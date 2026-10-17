@@ -1,0 +1,39 @@
+name: Check donsetch upstream
+
+on:
+    schedule:
+        - cron: "0 8 * * *"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    issues: write
+
+jobs:
+    check:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+
+            - name: Check bridge assumptions
+              run: node scripts/check-upstream.mjs
+
+            - name: Test the latest donsetch binary
+              run: |
+                  npm install --no-save @earendil-works/pi-mcp@1.1.0 donsetch@latest
+                  DONSETCH_BINARY="$PWD/node_modules/donsetch/binaries/donsetch" node scripts/probe-tools.mjs
+
+            - name: Open an issue on failure
+              if: failure()
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  existing="$(gh issue list --state open --search 'donsetch upstream check failed in:title' --json number --jq '.[0].number')"
+                  if [ -z "$existing" ]; then
+                    gh issue create \
+                      --title "donsetch upstream check failed" \
+                      --body "The scheduled check failed. Review the run at ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} and run \`node scripts/check-upstream.mjs\`."
+                  fi
