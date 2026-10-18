@@ -66,7 +66,8 @@ The addon gives the child process a limited environment. It includes `PATH`, `HO
 - `web_fetch` and the other tools with `deadline_ms`, and `web_crawl` with `deadline_s`, use the budget in the call.
 - `web_fetch` is not read-only. Plan mode blocks it. It can click, type, or press and can change remote state.
 - The other three tools are read-only.
-- A dropped connection is retried once only for the read-only tools. `web_fetch` is not retried. A crash does not replay it.
+- A dropped connection is retried once only for the read-only tools. `web_fetch` is not retried, and Pi Pocket does not replay it after a crash.
+- DonSeTch runs under `--supervised`. Its supervisor can resend an unanswered call after a crash, including a `web_fetch` with page actions. Avoid page actions with important side effects.
 - Cancelling the tool call sends the cancellation to the MCP server.
 
 ## Security
