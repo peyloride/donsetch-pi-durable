@@ -76,7 +76,7 @@ interface StaticTool {
 }
 
 // BEGIN GENERATED TOOLS
-const TOOLS_VERSION = "4.10.1";
+const TOOLS_VERSION = "4.10.2";
 const TOOLS: StaticTool[] = [
     {
         "name": "web_fetch",
