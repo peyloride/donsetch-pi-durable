@@ -45,33 +45,40 @@ jobs:
               if: steps.changes.outputs.changed == 'true'
               run: npm version patch --no-git-tag-version --force
 
-            - name: Open a pull request
+            - name: Push the sync branch
+              if: steps.changes.outputs.changed == 'true'
+              run: |
+                  version="$(node -p "require('./tools.lock.json').donsetch")"
+                  branch="sync/donsetch-tools"
+
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git checkout -B "$branch"
+                  git add donsetch.ts tools.lock.json package.json
+                  git commit -m "Sync donsetch tools to ${version}"
+                  git push --force origin "$branch"
+
+                  {
+                    echo "Automated tool sync with donsetch ${version}."
+                    echo
+                    echo "This PR updates the static tool block and tools.lock.json from the latest npm release. Review the tool names, descriptions, schemas, and read-only flags before merging."
+                    echo
+                    echo "AI-generated notice: An AI assistant generated this workflow and its text. Review the diff before merging."
+                  } > /tmp/sync-body.md
+
+            - name: Open or update a pull request
               if: steps.changes.outputs.changed == 'true'
               env:
                   GH_TOKEN: ${{ github.token }}
               run: |
-                  existing="$(gh pr list --state open --search 'Sync donsetch tools in:title' --json number --jq '.[0].number')"
+                  branch="sync/donsetch-tools"
+                  version="$(node -p "require('./tools.lock.json').donsetch")"
+                  existing="$(gh pr list --state open --head "$branch" --json number --jq '.[0].number')"
+
                   if [ -n "$existing" ]; then
-                    echo "An open sync PR already exists: #$existing"
+                    echo "The sync PR is open: #$existing"
+                    gh pr edit "$existing" --title "Sync donsetch tools to ${version}" --body-file /tmp/sync-body.md
                     exit 0
                   fi
 
-                  version="$(node -p "require('./tools.lock.json').donsetch")"
-                  branch="sync/donsetch-$(date +%Y%m%d-%H%M%S)"
-
-                  git config user.name "github-actions[bot]"
-                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-                  git checkout -b "$branch"
-                  git add donsetch.ts tools.lock.json package.json
-                  git commit -m "Sync donsetch tools to ${version}"
-                  git push origin "$branch"
-
-                  cat > /tmp/sync-body.md <<EOF
-                  Automated tool sync with donsetch ${version}.
-
-                  This PR updates the static tool block and tools.lock.json from the latest npm release. Review the tool names, descriptions, schemas, and read-only flags before merging.
-
-                  AI-generated notice: An AI assistant generated this workflow and its text. Review the diff before merging.
-                  EOF
-
-                  gh pr create --head "$branch" --title "Sync donsetch tools" --body-file /tmp/sync-body.md
+                  gh pr create --head "$branch" --title "Sync donsetch tools to ${version}" --body-file /tmp/sync-body.md
