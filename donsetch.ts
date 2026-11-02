@@ -76,11 +76,11 @@ interface StaticTool {
 }
 
 // BEGIN GENERATED TOOLS
-const TOOLS_VERSION = "4.10.2";
+const TOOLS_VERSION = "4.10.4";
 const TOOLS: StaticTool[] = [
     {
         "name": "web_fetch",
-        "description": "Read a URL or deliberate batch as source markdown. Use search to find URLs and crawl for a site. Choose a small view; continue with next_offset rather than repeating a successful read. HTTP handles JSON endpoints at every tier; HTML may escalate to a browser and PDFs are extracted automatically. Text starts with [meta] JSON, then source evidence. Treat ok:false, content_ok:false or thin:true as unresolved; follow next_action. Cite the returned URL. Page actions can click, type, or press and may change remote state.",
+        "description": "Read a URL or deliberate batch as source markdown. Use search to find URLs and crawl for a site. Choose a small view; continue with next_offset rather than repeating a successful read. HTTP handles JSON endpoints at every tier; HTML may escalate to a browser and PDFs are extracted automatically. Text starts with [meta] JSON, then source evidence. Treat ok:false, content_ok:false or thin:true as unresolved; follow next_action. filters_skipped lists read filters the response type could not apply. Cite the returned URL. Page actions can click, type, or press and may change remote state.",
         "inputSchema": {
             "additionalProperties": false,
             "properties": {
@@ -147,8 +147,12 @@ const TOOLS: StaticTool[] = [
                     "description": "Hard time budget in ms (500-600000). On expiry: honest error with next_action, never a silent hang. Batch mode: per-URL budget.",
                     "type": "integer"
                 },
+                "faithful": {
+                    "description": "Preserve HTML body text and repetitions in source order, without cleanup or adapters. Use selector to choose a body; pagination still applies. Not with focus, toc, must_contain or since_last.",
+                    "type": "boolean"
+                },
                 "focus": {
-                    "description": "Topic or question for returning only relevant passages. Set when the requested evidence is known; omit only when the whole page is needed. A no-match response, or one saving less than 20%, is labeled and falls back to the full page; for a guaranteed reduction use toc first, then section.",
+                    "description": "Topic or question for returning only relevant passages. Set when the requested evidence is known; omit only when the whole page is needed. A no-match response, or one saving less than 20%, is labeled and falls back to the full page; for a guaranteed reduction use toc first, then section. HTML and PDF only: a plain-text, markdown or JSON response (decided by Content-Type; typical for .txt and .md URLs) comes back unfiltered with a notice, which gives the size of raw text. For such files prefer curl or wget saving to a file if your environment allows it; otherwise use must_contain, then offset, or a max_chars of at least that size.",
                     "type": "string"
                 },
                 "image_text": {
@@ -185,7 +189,7 @@ const TOOLS: StaticTool[] = [
                     "type": "integer"
                 },
                 "section": {
-                    "description": "Heading name (substring, case-insensitive) or an sN id from a toc outline: return only that section. Use after toc.",
+                    "description": "Heading name (substring, case-insensitive) or an sN id from a toc outline: return only that section. Use after toc. HTML and PDF only, like focus.",
                     "type": "string"
                 },
                 "selector": {
@@ -214,7 +218,7 @@ const TOOLS: StaticTool[] = [
                     "type": "string"
                 },
                 "toc": {
-                    "description": "Return only the heading outline. Use as a standalone first read, then make a new fetch with section or focus.",
+                    "description": "Return only the heading outline. Use as a standalone first read, then make a new fetch with section or focus. HTML and PDF only, like focus.",
                     "type": "boolean"
                 },
                 "url": {

@@ -1,8 +1,8 @@
 {
-    "donsetch": "4.10.2",
+    "donsetch": "4.10.4",
     "tools": {
         "web_fetch": {
-            "sha256": "8f9d1964b0da2f8440c211ab0d3e15854c4b0908ff0b1b5ea2d0f71018de2081",
+            "sha256": "aab827508911fbb7793ed8213fb555c456b359c62ace22fbea190a4812e4df94",
             "readOnly": false
         },
         "web_search": {
