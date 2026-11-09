@@ -6,7 +6,7 @@ A Pi Pocket drop-in that gives Pi DonSeTch's four web tools.
 
 | Tool | What it does | Read-only |
 |---|---|---|
-| `web_fetch` | Read a URL as source markdown, with PDF, focus, section, and pagination support. | No. Page actions can change remote state. |
+| `web_fetch` | Read a page, PDF, or feed as source markdown, with focus, section, and pagination support. | Yes. |
 | `web_search` | Search the web without API keys. | Yes. |
 | `web_crawl` | Crawl a site with budgets, resume tokens, and stop reasons. | Yes. |
 | `web_screenshot` | Capture a rendered PNG. | Yes. |
@@ -43,6 +43,8 @@ The addon starts one MCP session for each Pi Pocket conversation. This keeps `S1
 
 The four tools are fixed in the addon. Donsetch behavior updates when you update the binary. New tool names, descriptions, schemas, or read-only flags need an addon update.
 
+Donsetch 5 removed page actions from `web_fetch`. All four tools now only read. The generator marks a tool as not read-only when its schema accepts `actions`, so a later version that adds them back updates the flag and the warning.
+
 - Update the binary with the Pi package, `donsetch update`, or npm.
 - On the first tool call, the addon compares the binary version with the version it was built for. If they differ, it shows a notice. No network call is made for this check.
 - The gallery shows "update available" when a new addon version is in the index. The owner reviews the diff and applies it. The gallery never auto-updates.
@@ -64,10 +66,10 @@ The addon gives the child process a limited environment. It includes `PATH`, `HO
 
 - One call waits for the tool's own budget plus 20 seconds of slack, capped at 620 seconds.
 - `web_fetch` and the other tools with `deadline_ms`, and `web_crawl` with `deadline_s`, use the budget in the call.
-- `web_fetch` is not read-only. Plan mode blocks it. It can click, type, or press and can change remote state.
-- The other three tools are read-only.
-- A dropped connection is retried once only for the read-only tools. `web_fetch` is not retried, and Pi Pocket does not replay it after a crash.
-- DonSeTch runs under `--supervised`. Its supervisor can resend an unanswered call after a crash, including a `web_fetch` with page actions. Avoid page actions with important side effects.
+- All four tools are read-only. Plan mode allows them.
+- A dropped connection is retried once for a read-only tool.
+- Pi Pocket can replay any of the four tools after a crash. A repeated read does not change remote state.
+- DonSeTch runs under `--supervised`. Its supervisor can resend an unanswered call after a crash. Every tool is read-only, so a repeat read is safe.
 - Cancelling the tool call sends the cancellation to the MCP server.
 
 ## Security
@@ -76,7 +78,6 @@ The addon gives the child process a limited environment. It includes `PATH`, `HO
 - The child process gets a limited environment. Provider keys and unrelated secrets stay out.
 - Web page text and images go to the model as tool results. The addon fences text with `host.text.defang` and adds a data notice. Images get the text notice. The model is told the content is data, not instructions.
 - `web_search` sends queries to Google, Bing, Brave, DuckDuckGo, Yahoo, Mojeek, GitHub, Wikipedia, Hacker News, Semantic Scholar, arXiv, Stack Exchange, MDN, and Google News. Donsetch can change this list.
-- `web_fetch` page actions can change state on the remote page. Use them only when the request needs them.
 - The addon does not read provider keys, cookies, or other credentials. Donsetch can use its own saved login cookies.
 - Review `donsetch.ts` before you turn it on. A drop-in runs with the owner's rights.
 

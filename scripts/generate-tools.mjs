@@ -13,7 +13,7 @@ import { McpClient, StdioTransport } from "@earendil-works/pi-mcp";
 
 const BINARY_NAMES = process.platform === "win32" ? ["donsetch.exe", "donsetch.cmd"] : ["donsetch"];
 const PACKAGE_BINARY = process.platform === "win32" ? "donsetch.exe" : "donsetch";
-const READ_ONLY = new Set(["web_search", "web_crawl", "web_screenshot"]);
+const READ_ONLY = new Set(["web_fetch", "web_search", "web_crawl", "web_screenshot"]);
 const SOURCE = new URL("../donsetch.ts", import.meta.url);
 const LOCK = new URL("../tools.lock.json", import.meta.url);
 const CHECK = process.argv.includes("--check");
@@ -76,15 +76,17 @@ function toolHash(tool) {
 
 function staticTool(tool) {
     const description = tool.description ?? tool.title ?? tool.name;
+    // A tool that accepts page actions can change remote state. Donsetch 5 removed them from
+    // web_fetch; if a later version adds them back, the flag and the warning follow the schema.
+    const actions = tool.inputSchema?.properties?.actions !== undefined;
 
     return {
         name: tool.name,
-        description:
-            tool.name === "web_fetch"
-                ? `${description} Page actions can click, type, or press and may change remote state.`
-                : description,
+        description: actions
+            ? `${description} Page actions can click, type, or press and may change remote state.`
+            : description,
         inputSchema: tool.inputSchema,
-        readOnly: READ_ONLY.has(tool.name),
+        readOnly: READ_ONLY.has(tool.name) && !actions,
     };
 }
 

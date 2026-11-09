@@ -1,20 +1,20 @@
 {
-    "donsetch": "4.10.4",
+    "donsetch": "5.2.1",
     "tools": {
         "web_fetch": {
-            "sha256": "aab827508911fbb7793ed8213fb555c456b359c62ace22fbea190a4812e4df94",
-            "readOnly": false
+            "sha256": "3415d6db74ef9ecffa37dcc1395b15e20218e54d5bfc1f6d2a74e63af749a6a4",
+            "readOnly": true
         },
         "web_search": {
-            "sha256": "7c97d8879b6dd5ecf2c9f09a195d4f598b5c97bf060a9df3747a6752bf3d32ff",
+            "sha256": "c1760ece96b5a30bcdab06946fb4f7648c42ca8662d8ce2c40f638cc2e81cc23",
             "readOnly": true
         },
         "web_crawl": {
-            "sha256": "5638940af2a9842b68828800f436a5e70605a2ebbe956632bd085e5313e1e84f",
+            "sha256": "a281f078982e8b5f899148f84410b59b5e6deecabc2b59ede7eb7b7da2176169",
             "readOnly": true
         },
         "web_screenshot": {
-            "sha256": "6b901c152bce279afa0e015a3bd507858100e8013c259c4bf8d096d1f3a71ff0",
+            "sha256": "b50fce93a519719eca06eec2b9c5674222ed8368ff32e6fd534738d8b472ca07",
             "readOnly": true
         }
     }

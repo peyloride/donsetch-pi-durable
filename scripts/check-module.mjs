@@ -42,31 +42,20 @@ try {
 
     const readOnly = Object.fromEntries(extension.tools.map((tool) => [tool.name, tool.annotations?.readOnlyHint]));
 
-    if (readOnly.web_fetch !== false) {
-        throw new Error("web_fetch must not be read-only");
-    }
-
-    for (const name of ["web_search", "web_crawl", "web_screenshot"]) {
+    // Donsetch 5 removed page actions from web_fetch, so every tool only reads now.
+    for (const name of expected) {
         if (readOnly[name] !== true) {
             throw new Error(`${name} must be read-only`);
         }
-    }
 
-    const fetch = extension.tools.find((tool) => tool.name === "web_fetch");
-
-    if (fetch === undefined || !/Page actions/.test(fetch.description)) {
-        throw new Error("web_fetch must warn about page actions");
-    }
-
-    if (fetch.replay !== "unsafe") {
-        throw new Error("web_fetch must not replay after a restart");
-    }
-
-    for (const name of ["web_search", "web_crawl", "web_screenshot"]) {
         const tool = extension.tools.find((candidate) => candidate.name === name);
 
         if (tool?.replay !== "safe") {
             throw new Error(`${name} must be safe to replay`);
+        }
+
+        if (/Page actions/.test(tool.description)) {
+            throw new Error(`${name} must not warn about page actions`);
         }
     }
 

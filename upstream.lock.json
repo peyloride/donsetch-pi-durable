@@ -1,12 +1,12 @@
 {
     "npm": {
         "name": "donsetch",
-        "version": "4.10.4"
+        "version": "5.2.1"
     },
     "source": {
-        "tarball": "https://registry.npmjs.org/donsetch/-/donsetch-4.10.4.tgz",
+        "tarball": "https://registry.npmjs.org/donsetch/-/donsetch-5.2.1.tgz",
         "path": "package/pi-extension.ts",
-        "sha256": "a0325d3f4ec46f2fa50b75486b26215042106fb92132860dde84c73733550ba5"
+        "sha256": "939c999be4ebc6446ee7412f3fd74bdfafb1ca47713ad05c2b451756042250ba"
     },
     "bridge": {
         "command": "mcp --supervised",
