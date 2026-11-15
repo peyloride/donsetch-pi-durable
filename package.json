@@ -1,6 +1,6 @@
 {
     "name": "donsetch-pi-durable",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "private": true,
     "type": "module",
     "description": "DonSeTch web fetch, search, crawl, and screenshot tools for Pi Pocket",
