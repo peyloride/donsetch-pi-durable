@@ -75,7 +75,7 @@ interface StaticTool {
 }
 
 // BEGIN GENERATED TOOLS
-const TOOLS_VERSION = "5.2.1";
+const TOOLS_VERSION = "5.4.1";
 const TOOLS: StaticTool[] = [
     {
         "name": "web_fetch",
@@ -185,6 +185,10 @@ const TOOLS: StaticTool[] = [
                     },
                     "maxItems": 2,
                     "description": "Optional array; maximum 2 alternate formulations for the same unmet requirement. Preserve entities and hard constraints; vary vocabulary, terminology, language or answer-bearing phrasing. Omit when no distinct retrieval angle exists."
+                },
+                "lang": {
+                    "type": "string",
+                    "description": "Optional BCP-47 language tag (en, uk, ne, pt-BR). It selects the answer language; a region subtag is the only way to select a market. Omit for the English default on Latin-script queries; no language or country is inferred from the query's script. An explicit lang uses the local language-aware sources; configured providers are bypassed for that call."
                 },
                 "max_results": {
                     "type": "integer",
