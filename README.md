@@ -8,7 +8,7 @@ A Pi Pocket drop-in that gives Pi DonSeTch's four web tools.
 |---|---|---|
 | `web_fetch` | Read a page, PDF, or feed as source markdown, with focus, section, and pagination support. | Yes. |
 | `web_search` | Search the web without API keys. | Yes. |
-| `web_crawl` | Crawl a site with budgets, resume tokens, and stop reasons. | Yes. |
+| `web_crawl` | Crawl a known site into a plan and a digest, with map, diff, get, and sites modes. | Yes. |
 | `web_screenshot` | Capture a rendered PNG. | Yes. |
 
 The addon talks to donsetch over MCP. It includes its own small MCP stdio client and imports only Pi Pocket's `@earendil-works/pi-ai` and `@earendil-works/pi-durable` packages. The four tools are defined in `donsetch.ts`. The binary handles the calls.
@@ -67,6 +67,7 @@ The addon gives the child process a limited environment. It includes `PATH`, `HO
 - One call waits for the tool's own budget plus 20 seconds of slack, capped at 620 seconds.
 - `web_fetch` and the other tools with `deadline_ms`, and `web_crawl` with `deadline_s`, use the budget in the call.
 - All four tools are read-only. Plan mode allows them.
+- `web_crawl` with `mode: "forget"` removes a local dossier. The other modes only read.
 - A dropped connection is retried once for a read-only tool.
 - Pi Pocket can replay any of the four tools after a crash. A repeated read does not change remote state.
 - DonSeTch runs under `--supervised`. Its supervisor can resend an unanswered call after a crash. Every tool is read-only, so a repeat read is safe.
