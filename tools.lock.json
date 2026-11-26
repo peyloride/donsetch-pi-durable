@@ -1,12 +1,12 @@
 {
-    "donsetch": "5.5.9",
+    "donsetch": "5.5.13",
     "tools": {
         "web_fetch": {
             "sha256": "3415d6db74ef9ecffa37dcc1395b15e20218e54d5bfc1f6d2a74e63af749a6a4",
             "readOnly": true
         },
         "web_search": {
-            "sha256": "dcb5b870aa3fcf5da26d81efeaff0ecd8e59d279cca012d0b3eb3d165c8574ec",
+            "sha256": "3fda462e56ed29885ff3643c3e54b1e12c2ac0b90dc4f2bdbb4f38811a1a1a5a",
             "readOnly": true
         },
         "web_crawl": {

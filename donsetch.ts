@@ -75,7 +75,7 @@ interface StaticTool {
 }
 
 // BEGIN GENERATED TOOLS
-const TOOLS_VERSION = "5.5.9";
+const TOOLS_VERSION = "5.5.13";
 const TOOLS: StaticTool[] = [
     {
         "name": "web_fetch",
@@ -210,9 +210,14 @@ const TOOLS: StaticTool[] = [
                         "code",
                         "paper",
                         "news",
-                        "entity"
+                        "entity",
+                        "image"
                     ],
-                    "description": "auto (default) detects from the query. Keyless mode adds first-party sources: code: + GitHub, HN, StackExchange, MDN, crates.io/npm/PyPI for a package name; paper: + OpenAlex, arXiv, Europe PMC (biomedical); news or a recent window ('this week'): + news wire, publisher feeds, HN; entity: + Wikipedia; web: general only. With a configured provider, intent selects that provider's filters instead (one provider; the keyless verticals do not join)."
+                    "description": "auto (default) detects from the query. Keyless mode adds first-party sources: code: + GitHub, HN, StackExchange, MDN, crates.io/npm/PyPI for a package name; paper: + OpenAlex, arXiv, Europe PMC (biomedical); news or a recent window ('this week'): + news wire, publisher feeds, HN; entity: + Wikipedia; image: explicit-only Bing Images + DuckDuckGo Images + Wikimedia Commons returning ranked image URLs (pair with contact_sheet:true for an inline PNG grid); web: general only. With a configured provider, intent selects that provider's filters instead (one provider; the keyless verticals do not join)."
+                },
+                "contact_sheet": {
+                    "type": "boolean",
+                    "description": "With intent=\"image\", fetch top thumbnails (SSRF-guarded) and return an inline rank-badged 3-column contact-sheet PNG alongside the URLs."
                 }
             },
             "required": [

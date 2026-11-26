@@ -21,6 +21,10 @@ jobs:
             - name: Install donsetch and test packages
               run: npm install --no-save @earendil-works/pi-mcp@1.1.0 @earendil-works/pi-ai@1.1.0 @earendil-works/pi-durable@1.1.0 donsetch@latest
 
+            # donsetch 5.5.3 removed the postinstall script: the wrapper fetches the binary on first use.
+            - name: Install the donsetch binary
+              run: node node_modules/donsetch/bin/donsetch.js --version
+
             - name: Generate the static tools
               env:
                   DONSETCH_BINARY: ${{ github.workspace }}/node_modules/donsetch/binaries/donsetch
