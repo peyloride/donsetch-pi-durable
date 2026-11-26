@@ -24,6 +24,8 @@ jobs:
             - name: Test the latest donsetch binary
               run: |
                   npm install --no-save @earendil-works/pi-mcp@1.1.0 donsetch@latest
+                  # donsetch 5.5.3 removed the postinstall script: the wrapper fetches the binary on first use.
+                  node node_modules/donsetch/bin/donsetch.js --version
                   DONSETCH_BINARY="$PWD/node_modules/donsetch/binaries/donsetch" node scripts/probe-tools.mjs
 
             - name: Open an issue on failure
